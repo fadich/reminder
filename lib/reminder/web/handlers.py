@@ -38,26 +38,10 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
     def __init__(self):
         super().__init__()
 
-        self._client_id: str = None
-        self._request: Request = None
-        self._ws: WebSocketResponse = None
-
         self._message_queue = Queue()
         self._loop = get_event_loop()
 
         self._connections: Dict[str, List[WebSocketResponse]] = {}
-
-    @property
-    def client_id(self):
-        return self._client_id
-
-    @property
-    def request(self):
-        return self._request
-
-    @property
-    def ws(self):
-        return self._ws
 
     @property
     def message_queue(self):
@@ -76,46 +60,50 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
         return tuple(self.connections.keys())
 
     @abc.abstractmethod
-    async def _authenticate(self):
-        """Should set self._client_id"""
+    async def _authenticate(self, request: Request) -> str:
+        """Should returns request"""
         pass
 
     @abc.abstractmethod
     async def on_message(self, data: Any):
+        """On message received"""
         pass
 
-    async def on_auth_failed(self):
+    async def on_auth_failed(self, ws: WebSocketResponse):
+        """On authorization failed, before disconnecting"""
         pass
 
-    async def on_connect(self):
+    async def on_connect(self, ws: WebSocketResponse):
+        """Post connection (on success auth)"""
         pass
 
-    async def on_disconnect(self):
+    async def on_disconnect(self, ws: WebSocketResponse):
+        """Pre disconnection (for last will message, for example)"""
         pass
 
     async def __call__(self, request: Request):
-        self._ws = WebSocketResponse()
-        self._request = request
-        await self.ws.prepare(self.request)
+        ws = WebSocketResponse()
+        request = request
+        await ws.prepare(request)
 
         try:
-            await self._authenticate()
-            if not self.client_id:
+            client_id = await self._authenticate(request)
+            if not client_id:
                 raise AuthenticationError()
         except AuthenticationError:
-            await self.on_auth_failed()
-            return self.ws
+            await self.on_auth_failed(ws)
+            return ws
 
-        await self._append_client()
-        await self.on_connect()
+        await self._append_client(client_id, ws)
+        await self.on_connect(ws)
 
-        run_coroutine_threadsafe(self._write_message(), self.loop)
-        await self._read_message()
+        run_coroutine_threadsafe(self._write_message(ws), self.loop)
+        await self._read_message(ws)
 
-        await self.on_disconnect()
-        await self._remove_client()
+        await self.on_disconnect(ws)
+        await self._remove_client(client_id, ws)
 
-        return self.ws
+        return ws
 
     async def send_message(self, msg: dict, client_id: str):
         await self.message_queue.put({
@@ -123,19 +111,19 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
             'data': msg
         })
 
-    async def _append_client(self):
-        if not isinstance(self._connections.get(self.client_id), list):
-            self._connections[self.client_id] = []
+    async def _append_client(self, client_id: str, ws: WebSocketResponse):
+        if not isinstance(self.connections.get(client_id), list):
+            self.connections[client_id] = []
 
-        self._connections.get(self.client_id).append(self.ws)
+        self.connections.get(client_id).append(ws)
 
-    async def _remove_client(self):
-        self._connections.get(self.client_id).remove(self._ws)
-        if not len(self._connections.get(self.client_id)):
-            del self._connections[self.client_id]
+    async def _remove_client(self, client_id: str, ws: WebSocketResponse):
+        self.connections.get(client_id).remove(ws)
+        if not len(self.connections.get(client_id)):
+            del self.connections[client_id]
 
-    async def _write_message(self):
-        while not self.ws.closed:
+    async def _write_message(self, ws: WebSocketResponse):
+        while not ws.closed:
             await sleep(0.001)
             if self.message_queue.empty():
                 continue
@@ -146,12 +134,12 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
             for client in clients:
                 run_coroutine_threadsafe(client.send_json(msg.get('data')), get_event_loop())
 
-    async def _read_message(self):
-        async for msg in self.ws:
-            await self._handle_message(msg)
+    async def _read_message(self, ws: WebSocketResponse):
+        async for msg in ws:
+            await self._handle_message(msg, ws)
             await sleep(0.001)
 
-    async def _handle_message(self, msg: WSMessage):
+    async def _handle_message(self, msg: WSMessage, ws: WebSocketResponse):
         if msg.type != WSMsgType.TEXT:
             logger.warning(f'ws message type is {msg.type}')
             return
@@ -159,7 +147,7 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
         try:
             data = json.loads(msg.data)
         except json.JSONDecodeError:
-            await self.ws.send_json({'error': 'invalid json format'})
+            await ws.send_json({'error': 'invalid json format'})
             return
 
         await self.on_message(data)
