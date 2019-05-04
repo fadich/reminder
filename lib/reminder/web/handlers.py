@@ -12,17 +12,24 @@ from asyncio import (
 )
 
 from aiohttp.web_request import Request
-from aiohttp.web_response import StreamResponse
 from aiohttp.http_websocket import WSMessage, WSMsgType
+from aiohttp.web_response import StreamResponse
 
+from .validation import Validator
 from .errors import AuthenticationError
-from .responce import WebSocketResponse
-
+from .responce import WebSocketResponse, JsonResponse
 
 logger = getLogger(__name__)
 
 
 class Handler(object, metaclass=abc.ABCMeta):
+
+    def __init__(self):
+        self._logger = getLogger(self.__class__.__name__)
+
+    @property
+    def logger(self):
+        return self._logger
 
     @abc.abstractmethod
     async def __call__(self, request: Request) -> StreamResponse:
@@ -30,7 +37,23 @@ class Handler(object, metaclass=abc.ABCMeta):
 
 
 class RestHandler(Handler, metaclass=abc.ABCMeta):
-    pass
+
+    def send_json(self, response: Any, status: int = 200, **kwargs) -> JsonResponse:
+        return JsonResponse(text=json.dumps(response), status=status, **kwargs)
+
+
+class RestValidationHandler(RestHandler, metaclass=abc.ABCMeta):
+
+    @property
+    @abc.abstractmethod
+    def validator(self) -> Validator:
+        pass
+
+    def validation_error_response(self):
+        return self.send_json({
+            'status': 'error',
+            'errors': self.validator.errors,
+        }, status=400)
 
 
 class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
@@ -65,7 +88,7 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    async def on_message(self, data: Any):
+    async def on_message(self, data: Any, ws: WebSocketResponse):
         """On message received"""
         pass
 
@@ -150,4 +173,4 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
             await ws.send_json({'error': 'invalid json format'})
             return
 
-        await self.on_message(data)
+        await self.on_message(data, ws)
