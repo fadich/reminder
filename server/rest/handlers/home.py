@@ -1,4 +1,5 @@
 from logging import getLogger
+from asyncio import run_coroutine_threadsafe, get_event_loop
 
 from aiohttp.web import Response
 
@@ -15,8 +16,11 @@ class HomeHandler(RestHandler):
     async def __call__(self, request):
         q = request.query.get('q')
 
-        if len(notification_handler.connections.keys()):
-            await notification_handler.send_message({'Hello': q})
+        if len(notification_handler.active_clients):
+            for client in notification_handler.active_clients:
+                run_coroutine_threadsafe(
+                    notification_handler.send_message({'Hello': q}, client),
+                    get_event_loop())
             return Response(text='Hello!')
 
         return Response(text='No connections')

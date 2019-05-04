@@ -1,7 +1,7 @@
 import abc
 import json
 
-from typing import Any
+from typing import Any, List, Dict
 from logging import getLogger
 
 from asyncio import (
@@ -15,6 +15,7 @@ from aiohttp.web_request import Request
 from aiohttp.web_response import StreamResponse
 from aiohttp.http_websocket import WSMessage, WSMsgType
 
+from .errors import AuthenticationError
 from .responce import WebSocketResponse
 
 
@@ -37,57 +38,101 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
     def __init__(self):
         super().__init__()
 
-        self.ws: WebSocketResponse = None
+        self._client_id: str = None
+        self._request: Request = None
+        self._ws: WebSocketResponse = None
 
-        self.message_queue = Queue()
-        self.loop = get_event_loop()
+        self._message_queue = Queue()
+        self._loop = get_event_loop()
 
-        self._connections = {}
+        self._connections: Dict[str, List[WebSocketResponse]] = {}
+
+    @property
+    def client_id(self):
+        return self._client_id
+
+    @property
+    def request(self):
+        return self._request
+
+    @property
+    def ws(self):
+        return self._ws
+
+    @property
+    def message_queue(self):
+        return self._message_queue
+
+    @property
+    def loop(self):
+        return self._loop
+
+    @property
+    def connections(self):
+        return self._connections
+
+    @property
+    def active_clients(self):
+        return tuple(self.connections.keys())
+
+    @abc.abstractmethod
+    async def _authenticate(self):
+        """Should set self._client_id"""
+        pass
+
+    @abc.abstractmethod
+    async def on_message(self, data: Any):
+        pass
+
+    async def on_auth_failed(self):
+        pass
+
+    async def on_connect(self):
+        pass
+
+    async def on_disconnect(self):
+        pass
 
     async def __call__(self, request: Request):
-        self.ws = WebSocketResponse()
-        await self.ws.prepare(request)
+        self._ws = WebSocketResponse()
+        self._request = request
+        await self.ws.prepare(self.request)
+
+        try:
+            await self._authenticate()
+            if not self.client_id:
+                raise AuthenticationError()
+        except AuthenticationError:
+            await self.on_auth_failed()
+            return self.ws
+
+        await self._append_client()
         await self.on_connect()
 
         run_coroutine_threadsafe(self._write_message(), self.loop)
         await self._read_message()
 
         await self.on_disconnect()
+        await self._remove_client()
 
         return self.ws
 
-    @abc.abstractmethod
-    async def on_message(self, data: Any):
-        pass
+    async def send_message(self, msg: dict, client_id: str):
+        await self.message_queue.put({
+            'client_id': client_id,
+            'data': msg
+        })
 
-    @property
-    def connections(self):
-        return self._connections
+    async def _append_client(self):
+        if not isinstance(self._connections.get(self.client_id), list):
+            self._connections[self.client_id] = []
 
-    async def send_message(self, msg: dict):
-        await self.message_queue.put(msg)
+        self._connections.get(self.client_id).append(self.ws)
 
-    async def on_connect(self):
-        logger.info(f'<{self.ws}> connected')
-
-        logger.debug(self.connections)
-
-        if not isinstance(self._connections.get(str(self.ws)), list):
-            self._connections[str(self.ws)] = []
-
-        self._connections.get(str(self.ws)).append(self.ws)
-
-        logger.debug(self.connections)
-
-    async def on_disconnect(self):
-        logger.debug(self.connections)
-        logger.info(f'<{self.ws}> disconnected')
-
-        self._connections.get(str(self.ws)).remove(self.ws)
-        if not len(self._connections.get(str(self.ws))):
-            del self._connections[str(self.ws)]
-
-        logger.debug(self.connections)
+    async def _remove_client(self):
+        self._connections.get(self.client_id).remove(self._ws)
+        if not len(self._connections.get(self.client_id)):
+            del self._connections[self.client_id]
 
     async def _write_message(self):
         while not self.ws.closed:
@@ -95,8 +140,11 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
             if self.message_queue.empty():
                 continue
 
-            msg = await self.message_queue.get()
-            await self.ws.send_json(msg)
+            msg = await self.message_queue.get()  # type: dict
+            clients = self.connections.get(msg.get('client_id'))
+
+            for client in clients:
+                run_coroutine_threadsafe(client.send_json(msg.get('data')), get_event_loop())
 
     async def _read_message(self):
         async for msg in self.ws:
