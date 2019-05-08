@@ -117,14 +117,16 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
             await self.on_auth_failed(ws)
             return ws
 
-        await self._append_client(client_id, ws)
+        ws.client_id = client_id
+
+        await self._append_client(ws)
         await self.on_connect(ws)
 
         run_coroutine_threadsafe(self._write_message(ws), self.loop)
         await self._read_message(ws)
 
         await self.on_disconnect(ws)
-        await self._remove_client(client_id, ws)
+        await self._remove_client(ws)
 
         return ws
 
@@ -134,16 +136,16 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
             'data': msg
         })
 
-    async def _append_client(self, client_id: str, ws: WebSocketResponse):
-        if not isinstance(self.connections.get(client_id), list):
-            self.connections[client_id] = []
+    async def _append_client(self, ws: WebSocketResponse):
+        if not isinstance(self.connections.get(ws.client_id), list):
+            self.connections[ws.client_id] = []
 
-        self.connections.get(client_id).append(ws)
+        self.connections.get(ws.client_id).append(ws)
 
-    async def _remove_client(self, client_id: str, ws: WebSocketResponse):
-        self.connections.get(client_id).remove(ws)
-        if not len(self.connections.get(client_id)):
-            del self.connections[client_id]
+    async def _remove_client(self, ws: WebSocketResponse):
+        self.connections.get(ws.client_id).remove(ws)
+        if not len(self.connections.get(ws.client_id)):
+            del self.connections[ws.client_id]
 
     async def _write_message(self, ws: WebSocketResponse):
         while not ws.closed:

@@ -12,6 +12,8 @@ class HashObserver(object):
         self.path = path
         self.excluded = set(exclude or ('.idea', 'venv', '.git'))
 
+        self._stopped = False
+
     def filter_excluded(self, names: Iterable) -> Iterable:
         def regex_excluded(item):
             for exclude in self.excluded:
@@ -53,9 +55,13 @@ class HashObserver(object):
 
     def observe(self, callback: Callable, *args, **kwargs):
         hsh = self.hash
-        while True:
+        self._stopped = False
+        while not self._stopped:
             time.sleep(0.1)
             if self.hash == hsh:
                 continue
             hsh = self.hash
             callback(*args, **kwargs)
+
+    def stop(self):
+        self._stopped = True

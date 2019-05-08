@@ -1,11 +1,12 @@
 import os
+import sys
 import subprocess
 
 from threading import Thread
 from hash_observer import HashObserver
 
 
-def main():
+def main(*args):
     ignored = {
         '*.md',
         '*.cfg',
@@ -34,13 +35,25 @@ def main():
 
     t1 = Thread(target=lib_observer.observe, args=(install_lib, ))
     t2 = Thread(target=server_observer.observe, args=(start_server, ))
+    t1.start()
+    t2.start()
 
     try:
-        t1.start()
-        t2.start()
+        while True:
+            pass
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        return -1
+    finally:
+        lib_observer.stop()
+        server_observer.stop()
+
+        t1.join()
+        t2.join()
+
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main(*sys.argv[1:]))
