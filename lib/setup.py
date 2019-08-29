@@ -10,7 +10,11 @@ setup(
     description='Reminder chat utils',
     packages=find_packages(),
     zip_safe=False,
-    requires=[
-        'aiohttp',
+    install_requires=[
+        'aiohttp==3.5.4',
+        'tree-guardian==0.1.3',
+    ],
+    scripts=[
+        'bin/reminder-dev-server',
     ]
 )
