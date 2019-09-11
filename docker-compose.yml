@@ -1,0 +1,28 @@
+version: '3.4'
+
+services:
+
+  lib:
+    build: '.'
+    container_name: reminder_lib
+
+  home:
+    build: 'services/home'
+    depends_on:
+      - lib
+    ports:
+      - 8000:8000
+
+  messaging:
+    build: 'services/messaging'
+    depends_on:
+      - lib
+    ports:
+      - 8080:8000
+
+  rooms:
+    build: 'services/rooms'
+    depends_on:
+      - lib
+    ports:
+      - 8001:8000

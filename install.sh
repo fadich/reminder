@@ -5,7 +5,7 @@ python setup.py sdist
 pip install dist/*
 cd ..
 
-pip install -r requirements.txt
+# pip install -r requirements.txt
 
 echo
 echo 'To start the server app, execute:'

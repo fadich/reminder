@@ -24,32 +24,36 @@ class Handler:
 
     def main(self):
         parser = argparse.ArgumentParser(description='run local development server')
-        parser.add_argument('service', type=str, help='service name')
+        parser.add_argument('service_path', type=str, help='service name')
         parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='set debug log level')
         parser.add_argument('--host', dest='host', type=str, default='0.0.0.0', help='server host address')
         parser.add_argument('--port', dest='port', type=int, default=8000, help='server host port')
+        parser.add_argument('--lib-path', dest='lib_path', type=str, default='lib',
+                            help='path to remainder library source')
+        parser.add_argument('--lib-installer', dest='lib_installer', type=str, default='./install.sh',
+                            help='remainder library installer script')
+        parser.add_argument('--entry-point', dest='entry_point', type=str, default='main.py',
+                            help='service main script')
         args = parser.parse_args()
-
-        service_path = f'services/{args.service}'
 
         def start_server():
             if getattr(Handler, '_sub', None):
                 self.write('Restarting server...')
                 Handler._sub.kill()
             Handler._sub = subprocess.Popen(
-                ['python', f'{service_path}/main.py', f'--host={args.host}', f'--port={args.port}'])
+                ['python', f'{args.service_path}/{args.entry_point}', f'--host={args.host}', f'--port={args.port}'])
 
         def install_lib():
-            sp = subprocess.Popen(['./install.sh'])
+            sp = subprocess.Popen([args.lib_installer])
             sp.wait()
             start_server()
 
         install_lib()
         break_event = Event()
-        observe(callback=install_lib, path='lib', run_async=True, event=break_event)
+        observe(callback=install_lib, path=args.lib_path, run_async=True, event=break_event)
 
         try:
-            observe(callback=start_server, path=service_path)
+            observe(callback=start_server, path=args.service_path)
         except KeyboardInterrupt:
             return 0
         finally:
