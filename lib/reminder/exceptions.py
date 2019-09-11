@@ -1,0 +1,3 @@
+
+class DeprecatedError(NotImplementedError):
+    pass

@@ -5,20 +5,17 @@ from traceback import format_exc
 from aiohttp.web_request import Request
 from aiohttp.web_response import StreamResponse
 
-from reminder.web.handlers import RestValidationHandler
+from reminder.web.rest.handlers import ValidationHandler
 from reminder.web.validation import FieldsValidator
 
 from orm.models import Room
 
 
-class CreateRoomHandler(RestValidationHandler):
-
+class CreateRoomHandler(ValidationHandler):
     rooms = {}
 
-    def __init__(self):
-        super().__init__()
-        self._validator = FieldsValidator()
-        self._validator.add_rules({
+    def rules(self) -> dict:
+        return {
             'name': [
                 (FieldsValidator.VALIDATE_REQUIRED, 'No name set'),
                 (FieldsValidator.VALIDATE_TYPE_STRING, 'String type expected'),
@@ -28,11 +25,7 @@ class CreateRoomHandler(RestValidationHandler):
                 (FieldsValidator.VALIDATE_TYPE_LIST, 'List expected'),
                 (lambda field: all(isinstance(client, str) for client in field), 'Client ID should be a string'),
             ]
-        })
-
-    @property
-    def validator(self) -> FieldsValidator:
-        return self._validator
+        }
 
     async def __call__(self, request: Request) -> StreamResponse:
         data = dict(await request.post())
@@ -60,4 +53,3 @@ class CreateRoomHandler(RestValidationHandler):
                 'room_id': 1,
             },
         })
-

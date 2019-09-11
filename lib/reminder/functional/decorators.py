@@ -1,21 +1,30 @@
 from typing import Callable
+from logging import getLogger
+
+from reminder.exceptions import DeprecatedError
+
+
+logger = getLogger(__name__)
+
+
+class BaseDecorator(object):
+
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
 
 
 class ComputedPropertyMeta(type):
     pass
 
 
-class Property(metaclass=ComputedPropertyMeta):
-
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
+class property(BaseDecorator, metaclass=ComputedPropertyMeta):
 
     def __call__(self, func: Callable):
         return func(*self.args, **self.kwargs)
 
 
-class CashedProperty(Property):
+class cashed_property(property):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -28,15 +37,30 @@ class CashedProperty(Property):
         return super().__call__(self.func)
 
 
+class deprecated(BaseDecorator):
+
+    def __init__(self, raise_error=True, *args, **kwargs):
+        self.raise_error = raise_error
+        super().__init__(*args, **kwargs)
+
+    def __call__(self, func: Callable):
+        error_msg = f'Calling of deprecated function {func.__name__}'
+        if not self.raise_error:
+            logger.warning(error_msg)
+            return func
+
+        raise DeprecatedError(error_msg)
+
+
 if __name__ == '__main__':
 
-    @Property(word='There!')
+    @property(word='There!')
     def hello(word: str = 'World'):
         return f'Hello {word}'
 
     print(hello)
 
-    @CashedProperty()
+    @cashed_property()
     def get_time():
         import time
         return time.time()

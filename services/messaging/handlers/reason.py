@@ -2,7 +2,8 @@ from typing import Any
 
 from reminder.web.errors import AuthenticationError
 from reminder.web.validation import FieldsValidator
-from reminder.web.handlers import WebSocketHandler, WebSocketResponse
+from reminder.web.websocket.handlers import WebSocketHandler
+from reminder.web.websocket.response import WebSocketResponse
 
 from .reason_maintainers import ReasonMessageMaintainer
 

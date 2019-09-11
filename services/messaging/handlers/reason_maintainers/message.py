@@ -1,6 +1,6 @@
 from typing import Any
 
-from reminder.web.handlers import WebSocketResponse
+from reminder.web.websocket.response import WebSocketResponse
 
 
 class ReasonMessageMaintainer(object):
