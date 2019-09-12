@@ -70,7 +70,7 @@ class WebSocketHandler(Handler, metaclass=abc.ABCMeta):
         """Pre disconnection (for last will message, for example)"""
         pass
 
-    async def __call__(self, request: Request):
+    async def handle(self, request: Request):
         ws = WebSocketResponse()
         request = request
         await ws.prepare(request)

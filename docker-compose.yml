@@ -1,28 +1,73 @@
 version: '3.4'
 
+x-common-variables: &common-variables
+  MONGO_HOST: mongo
+
+
 services:
 
   lib:
     build: '.'
     container_name: reminder_lib
 
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - 27017:27017
+#    environment:
+#      MONGO_INITDB_ROOT_USERNAME: root
+#      MONGO_INITDB_ROOT_PASSWORD: password
+
+  auth:
+    build: 'services/auth'
+    restart: always
+    depends_on:
+      - lib
+      - mongo
+    ports:
+      - 8010:8000
+    volumes:
+      - ./lib:/etc/lib
+      - ./services/auth:/etc/auth
+    environment:
+        <<: *common-variables
+
   home:
     build: 'services/home'
+    restart: always
     depends_on:
-      - lib
+      - auth
     ports:
       - 8000:8000
-
-  messaging:
-    build: 'services/messaging'
-    depends_on:
-      - lib
-    ports:
-      - 8080:8000
+    volumes:
+      - ./lib:/etc/lib
+      - ./services/home:/etc/home
+    environment:
+      <<: *common-variables
 
   rooms:
     build: 'services/rooms'
+    restart: always
     depends_on:
-      - lib
+      - home
     ports:
       - 8001:8000
+    volumes:
+      - ./lib:/etc/lib
+      - ./services/rooms:/etc/rooms
+    environment:
+      <<: *common-variables
+
+  messaging:
+    build: 'services/messaging'
+    restart: always
+    depends_on:
+      - rooms
+    ports:
+      - 8080:8000
+    volumes:
+      - ./lib:/etc/lib
+      - ./services/messaging:/etc/messaging
+    environment:
+      <<: *common-variables

@@ -1,7 +1,7 @@
 from typing import Any
 
 from reminder.web.errors import AuthenticationError
-from reminder.web.validation import FieldsValidator
+from reminder.validation import FieldsValidator
 from reminder.web.websocket.handlers import WebSocketHandler
 from reminder.web.websocket.response import WebSocketResponse
 
@@ -24,9 +24,9 @@ class ReasonHandler(WebSocketHandler, ReasonMessageMaintainer):
         validator = FieldsValidator()
         validator.add_rules({
             'reason': [
-                (FieldsValidator.VALIDATE_REQUIRED, 'No reason specified'),
-                (FieldsValidator.VALIDATE_TYPE_STRING, 'Invalid reason format'),
-                (lambda f: hasattr(self, reason_handler), f'Unknown reason "{data.get("reason")}"'),
+                FieldsValidator.VALIDATE_REQUIRED,
+                FieldsValidator.VALIDATE_TYPE_STRING,
+                (lambda v, *args, **kwargs: hasattr(self, reason_handler), f'Unknown reason "{data.get("reason")}"'),
             ],
             'data': [],
         })

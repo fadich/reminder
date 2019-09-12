@@ -20,42 +20,42 @@ class Validator(object):
         self._errors = {}
 
     @staticmethod
-    def validate_required(field):
-        return field is not None
+    def validate_required(value, *args, **kwargs):
+        return value is not None
 
     @staticmethod
-    def validate_type_int(field):
-        return isinstance(field, int)
+    def validate_type_int(value, *args, **kwargs):
+        return isinstance(value, int)
 
     @staticmethod
-    def validate_type_float(field):
-        return isinstance(field, float)
+    def validate_type_float(value, *args, **kwargs):
+        return isinstance(value, float)
 
     @staticmethod
-    def validate_type_number(field):
-        return Validator.validate_type_float(field) or Validator.validate_type_int(field)
+    def validate_type_number(value, *args, **kwargs):
+        return Validator.validate_type_float(value) or Validator.validate_type_int(value)
 
     @staticmethod
-    def validate_type_string(field):
-        return isinstance(field, str)
+    def validate_type_string(value, *args, **kwargs):
+        return isinstance(value, str)
 
     @staticmethod
-    def validate_type_list(field):
-        return isinstance(field, list)
+    def validate_type_list(value, *args, **kwargs):
+        return isinstance(value, list)
 
     @staticmethod
-    def validate_type_dict(field):
-        return isinstance(field, dict)
+    def validate_type_dict(value, *args, **kwargs):
+        return isinstance(value, dict)
 
 
 class FieldsValidator(Validator):
-    VALIDATE_REQUIRED = Validator.validate_required
-    VALIDATE_TYPE_INT = Validator.validate_type_int
-    VALIDATE_TYPE_FLOAT = Validator.validate_type_float
-    VALIDATE_TYPE_NUMBER = Validator.validate_type_number
-    VALIDATE_TYPE_STRING = Validator.validate_type_string
-    VALIDATE_TYPE_LIST = Validator.validate_type_list
-    VALIDATE_TYPE_DICT = Validator.validate_type_dict
+    VALIDATE_REQUIRED = (Validator.validate_required, 'should not be empty')
+    VALIDATE_TYPE_INT = (Validator.validate_type_int, 'should be an integer')
+    VALIDATE_TYPE_FLOAT = (Validator.validate_type_float, 'should be a floating point number')
+    VALIDATE_TYPE_NUMBER = (Validator.validate_type_number, 'should be a number')
+    VALIDATE_TYPE_STRING = (Validator.validate_type_string, 'should be a string')
+    VALIDATE_TYPE_LIST = (Validator.validate_type_list, 'should be a list')
+    VALIDATE_TYPE_DICT = (Validator.validate_type_dict, 'should be an object')
 
     def __init__(self):
         super().__init__()
@@ -74,8 +74,8 @@ class FieldsValidator(Validator):
         """Example:
         {
             'field_name': [
-                (FieldsValidationHandler.VALIDATE_REQUIRED, 'This field is required'),
-                (FieldsValidationHandler.VALIDATE_TYPE_DICT, 'Invalid field type'),
+                FieldsValidationHandler.VALIDATE_REQUIRED,
+                FieldsValidationHandler.VALIDATE_TYPE_DICT,
             ]
         }
         """
@@ -88,19 +88,18 @@ class FieldsValidator(Validator):
     def validate(self, fields: Iterable = None):
         fields = fields or self.fields.keys()
 
-        for rule_field, rules in self.validation_rules.items():
+        for field, rules in self.validation_rules.items():
             for rule in rules:
-                if rule[0] == FieldsValidator.VALIDATE_REQUIRED and rule_field not in fields:
-                    self.add_error(rule_field, rule[1])
+                if rule[0] == FieldsValidator.VALIDATE_REQUIRED[0] and field not in fields:
+                    self.add_error(field, rule[1])
 
         for field in fields:
             if field not in self.validation_rules:
                 self.add_error(field, 'Unexpected field')
                 continue
             for is_valid, error in self.validation_rules[field]:
-                if not is_valid(self.fields[field]):
+                if not is_valid(self.fields[field], field):
                     self.add_error(field, error)
-                    break
 
     def is_valid(self):
         self.validate()
