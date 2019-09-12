@@ -9,9 +9,7 @@ from reminder.web.utils import get_server_argument_parser
 
 class Application(object):
 
-    def __init__(self, description: str = None, argument_parser=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    def __init__(self, description: str = None, argument_parser=None):
         self.application = BaseApp()
         self._argument_parser = get_server_argument_parser(description, argument_parser)
 
