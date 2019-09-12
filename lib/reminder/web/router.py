@@ -1,7 +1,7 @@
 from aiohttp.web_routedef import RouteTableDef
 
 from reminder.web.handlers import Handler
-from reminder.functional.decorators import CashedProperty
+from reminder.functional.decorators import cashed_property
 
 
 ALLOWED_METHODS = ('head', 'get', 'post', 'patch', 'put', 'delete')
@@ -10,25 +10,27 @@ ALLOWED_METHODS = ('head', 'get', 'post', 'patch', 'put', 'delete')
 class RouteTable(object):
 
     def __init__(self):
-        self._route_table = RouteTableDef()
+        self._route_table_def = RouteTableDef()
 
-    def add(self, path: str, handler: Handler, method: str = 'get'):
-        method = method.lower()
+    def add(self, path: str, handler: Handler, http_method: str = 'get'):
+        http_method = http_method.lower()
 
-        if method not in ALLOWED_METHODS:
-            raise AssertionError(f'Unknown method "{method}"')
+        if http_method not in ALLOWED_METHODS:
+            raise AssertionError(f'Unknown method "{http_method}"')
+
         if not isinstance(handler, Handler):
             raise AssertionError(f'Handler should be instance of "{Handler}", "{handler.__class__}" given')
 
-        attr = getattr(self._route_table, method)
-        func = attr(path)
-        func(handler)
+        """The structure is `route_table_def -> http_method -> path -> handler`"""
+        method = getattr(self._route_table_def, http_method)
+        route_register = method(path)
+        route_register(handler)
 
     @property
     def table_def(self):
-        return self._route_table
+        return self._route_table_def
 
 
-@CashedProperty()
+@cashed_property()
 def route_table():
     return RouteTable()

@@ -12,7 +12,8 @@ setup(
     zip_safe=False,
     install_requires=[
         'aiohttp==3.5.4',
-        'tree-guardian==0.1.3',
+        'tree-guardian==0.1.4-dev',
+        'pymongo==3.9.0',
     ],
     scripts=[
         'bin/reminder-dev-server',

@@ -1,0 +1,6 @@
+dist
+reminder.egg-info
+
+__pychache__
+*.pyc
+venv

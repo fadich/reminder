@@ -1,17 +1,19 @@
-from aiohttp.web_routedef import RouteTableDef
-
-from reminder.web.router import RouteTable
+from argparse import ArgumentParser
 
 
 __all__ = [
-    'register_routes',
+    'get_server_argument_parser',
 ]
 
 
-def register_routes(module) -> RouteTableDef:
-    route_table_attr = 'route_table'
-    if not hasattr(module, route_table_attr):
-        raise AttributeError(f'Module "{module.__name__}" has no attribute "{route_table_attr}". '
-                             f'Expected "{route_table_attr}" as an instance of <{RouteTable}>')
+def get_server_argument_parser(description: str = None, parser: ArgumentParser = None):
+    if not parser:
+        parser = ArgumentParser(description=description)
+    elif description:
+        parser.description = description
 
-    return getattr(module, route_table_attr).table_def
+    parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='set debug log level')
+    parser.add_argument('--host', dest='host', type=str, default='0.0.0.0', help='server host address')
+    parser.add_argument('--port', dest='port', type=int, default=8000, help='server host port')
+
+    return parser

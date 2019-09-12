@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 
-REMINDER_VERSION=$(pip show reminder | grep "Version: " | cut -d':' -f 2 | sed -e s/^[[:space:]]*//)
-
 cd lib
 python setup.py sdist
-pip install dist/reminder-0.1.0.tar.gz
+pip install dist/*
 cd ..
 
-pip install -r server/requirements.txt
+# pip install -r requirements.txt
+
+echo
+echo 'To start the server app, execute:'
+echo
+echo '  reminder-dev-server SERVICE_NAME'
+echo
