@@ -1,24 +1,33 @@
 import abc
 
+from typing import Iterable
 from logging import getLogger
 from bson.objectid import ObjectId
 
 from reminder.orm import get_collection
-from reminder.validation import FieldsValidator
+from reminder.orm.fields import Field, ObjectIdField
 from reminder.orm.exceptions import ValidationError
 
 
 class Entity(object, metaclass=abc.ABCMeta):
+    _id = ObjectIdField()
+    _unique_fields = ()
+
+    _values = {}
 
     def __init__(self, **kwargs):
         super().__init__()
 
-        self._id = None  # type: ObjectId
         self._logger = getLogger(self.__class__.__name__.lower())
 
-        self._validator = FieldsValidator()
-        self._validator.add_rules(self.get_rules())
-        self._validator.load_data(kwargs)
+        for attr, value in kwargs.items():
+            field = getattr(self.__class__, attr)
+            if isinstance(field, Field):
+                field._setup_field_name(attr)
+            setattr(self, attr, value)
+
+        if not self._is_unique():
+            raise ValidationError('Not unique')
 
     @property
     def object_id(self):
@@ -28,40 +37,34 @@ class Entity(object, metaclass=abc.ABCMeta):
     def logger(self):
         return self._logger
 
-    @property
-    def validator(self):
-        return self._validator
-
     @classmethod
     def get_collection(cls):
         return get_collection(cls.__name__.lower())
 
-    @classmethod
-    def get_rules(cls):
-        return {}
-
-    def __getattr__(self, item):
-        return self.validator.fields.get(item)
-
-    def to_dict(self, skip_id=False):
+    def to_dict(self, exclude: Iterable = None):
         obj = {}
-        for field in self.get_rules():
-            obj[field] = getattr(self, field)
+        for attr in self._values.keys():
+            print('***' * 80)
+            print(self._values)
+            print(attr)
+            print('***' * 80)
+            if attr in exclude:
+                continue
+            if attr == '_id' and self.object_id:
+                obj['_id'] = str(self.object_id)
+                continue
 
-        if not skip_id:
-            obj['_id'] = str(self.object_id) if self.object_id else None
+            obj[attr] = getattr(self, attr)
 
         return obj
 
     def save(self):
-        if not self.validator.is_valid():
-            raise ValidationError(self.validator.errors)
-
-        fields = self.to_dict(True)
+        fields = self.to_dict(exclude=('_id', ))
         collection = self.__class__.get_collection()
         if self.object_id:
             collection.replace_one({'_id': self.object_id}, fields)
         else:
+            getattr(self.__class__, '_id')._setup_field_name('_id')
             self._id = collection.insert_one(fields).inserted_id
 
     @classmethod
@@ -70,20 +73,29 @@ class Entity(object, metaclass=abc.ABCMeta):
         if not fields:
             return None
 
-        _id = fields.pop('_id')
-        user = cls(**fields)
-        user._id = _id
-
-        return user
+        return cls(**fields)
 
     @classmethod
     def find_by_id(cls, object_id: str):
         return cls.find_one({'_id': ObjectId(object_id)})
 
+    def _is_unique(self):
+        for fields in self._unique_fields:
+            conditions = []
+            for field in fields:
+                conditions.append({
+                    field: getattr(self, field)
+                })
 
-def validate_unique(entity: Entity, error: str = 'already exists'):
-    def is_valid(value, field_name: str):
-        fields = entity.find_one({field_name: value})
-        return not bool(fields)
+            criteria = {'$and': conditions}
+            if self.object_id:
+                criteria['$and'].append({
+                    '_id': {
+                        '$ne': self.object_id,
+                    },
+                })
 
-    return is_valid, error
+            if self.get_collection().find_one(criteria):
+                return False
+
+        return True

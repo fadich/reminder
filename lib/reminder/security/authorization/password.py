@@ -2,6 +2,8 @@ import os
 import hashlib
 import binascii
 
+from .user import User
+
 
 def hash_password(password: str):
     """Hash a password for storing."""
@@ -22,3 +24,7 @@ def verify_password(password: str, stored_hash: str):
     hashed = binascii.hexlify(hashed).decode('ascii')
 
     return hashed == stored_password
+
+
+def set_password(user: User, password: str):
+    user.password = hash_password(password)

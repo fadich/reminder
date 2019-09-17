@@ -1,7 +1,36 @@
+from abc import ABCMeta, abstractmethod
 from typing import Dict, List, Tuple, Any, Iterable
 
 
-class Validator(object):
+def validate_required(value, *args, **kwargs):
+    return value is not None
+
+
+def validate_type_int(value, *args, **kwargs):
+    return isinstance(value, int)
+
+
+def validate_type_float(value, *args, **kwargs):
+    return isinstance(value, float)
+
+
+def validate_type_number(value, *args, **kwargs):
+    return validate_type_float(value) or validate_type_int(value)
+
+
+def validate_type_string(value, *args, **kwargs):
+    return isinstance(value, str)
+
+
+def validate_type_list(value, *args, **kwargs):
+    return isinstance(value, list)
+
+
+def validate_type_dict(value, *args, **kwargs):
+    return isinstance(value, dict)
+
+
+class Validator(object, metaclass=ABCMeta):
 
     def __init__(self):
         self._errors: Dict[str, str] = {}
@@ -19,43 +48,19 @@ class Validator(object):
     def clean_errors(self):
         self._errors = {}
 
-    @staticmethod
-    def validate_required(value, *args, **kwargs):
-        return value is not None
-
-    @staticmethod
-    def validate_type_int(value, *args, **kwargs):
-        return isinstance(value, int)
-
-    @staticmethod
-    def validate_type_float(value, *args, **kwargs):
-        return isinstance(value, float)
-
-    @staticmethod
-    def validate_type_number(value, *args, **kwargs):
-        return Validator.validate_type_float(value) or Validator.validate_type_int(value)
-
-    @staticmethod
-    def validate_type_string(value, *args, **kwargs):
-        return isinstance(value, str)
-
-    @staticmethod
-    def validate_type_list(value, *args, **kwargs):
-        return isinstance(value, list)
-
-    @staticmethod
-    def validate_type_dict(value, *args, **kwargs):
-        return isinstance(value, dict)
+    @abstractmethod
+    def validate(self):
+        pass
 
 
 class FieldsValidator(Validator):
-    VALIDATE_REQUIRED = (Validator.validate_required, 'should not be empty')
-    VALIDATE_TYPE_INT = (Validator.validate_type_int, 'should be an integer')
-    VALIDATE_TYPE_FLOAT = (Validator.validate_type_float, 'should be a floating point number')
-    VALIDATE_TYPE_NUMBER = (Validator.validate_type_number, 'should be a number')
-    VALIDATE_TYPE_STRING = (Validator.validate_type_string, 'should be a string')
-    VALIDATE_TYPE_LIST = (Validator.validate_type_list, 'should be a list')
-    VALIDATE_TYPE_DICT = (Validator.validate_type_dict, 'should be an object')
+    VALIDATE_REQUIRED = (validate_required, 'should not be empty')
+    VALIDATE_TYPE_INT = (validate_type_int, 'should be an integer')
+    VALIDATE_TYPE_FLOAT = (validate_type_float, 'should be a floating point number')
+    VALIDATE_TYPE_NUMBER = (validate_type_number, 'should be a number')
+    VALIDATE_TYPE_STRING = (validate_type_string, 'should be a string')
+    VALIDATE_TYPE_LIST = (validate_type_list, 'should be a list')
+    VALIDATE_TYPE_DICT = (validate_type_dict, 'should be an object')
 
     def __init__(self):
         super().__init__()
@@ -85,7 +90,7 @@ class FieldsValidator(Validator):
         self.clean_errors()
         self._fields = dict(fields)
 
-    def validate(self, fields: Iterable = None):
+    def validate(self, fields: Iterable[str] = None):
         fields = fields or self.fields.keys()
 
         for field, rules in self.validation_rules.items():

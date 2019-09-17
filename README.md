@@ -5,13 +5,23 @@
 
 ### Local deployment
 
-First of all, install lib and all requirements by executing:
+Whole project can be deployed by Docker Compose.
+
+#### Docker Environment
+
+Run the local server with docker-compose by executing following command:
+```bash
+docker-compose up
+```
+
+#### Outside the Docker
+
+Install lib and all requirements by executing:
 ```bash
 ./install
 ```
 
-Ro up the local server, run the command below:
+You can also run single microservice with:
 ```bash
-reminder-dev-server
+reminder-dev-server SERVICE_NAME
 ```
-
